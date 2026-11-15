@@ -1,0 +1,13 @@
+[package]
+name = "tinyhand-settings"
+version = "0.1.0"
+edition = "2021"
+description = "Settings window for TinyHand for Linux"
+license = "MIT"
+
+[dependencies]
+tinyhand = { path = ".." }
+# Feature levels: GTK 4.12 and libadwaita 1.4, so it runs on Ubuntu 24.04, Debian 13 and
+# Fedora 40 and later.
+gtk = { package = "gtk4", version = "0.11", features = ["v4_12"] }
+adw = { package = "libadwaita", version = "0.9", features = ["v1_4"] }

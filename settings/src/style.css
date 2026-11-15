@@ -1,0 +1,130 @@
+/* TinyHand Settings. Colours come from the Adwaita palette where possible, so the
+   window follows light/dark mode and the accent colour. */
+
+/* Pointer grid */
+flowbox.hand-grid {
+  padding: 6px;
+}
+flowbox.hand-grid > flowboxchild {
+  padding: 6px 4px 4px 4px;
+  border-radius: 12px;
+}
+.hand-tile label.title {
+  font-size: 0.85em;
+}
+.hand-tile .pin {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  margin: -2px;
+  opacity: 0;
+}
+flowboxchild:hover .hand-tile .pin,
+.hand-tile .pin:checked,
+.hand-tile .pin:focus-visible {
+  opacity: 1;
+}
+.hand-tile .pin:checked {
+  background: alpha(currentColor, 0.1);
+  color: @accent_color;
+}
+
+/* "In your toolbar" strip */
+.pin-strip {
+  padding: 10px;
+}
+.pin-strip .pin-slot {
+  padding: 6px;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 10px;
+}
+.pin-strip .pin-slot.empty {
+  background: alpha(currentColor, 0.035);
+  box-shadow: none;
+}
+.pin-strip .pin-slot.current {
+  box-shadow: inset 0 0 0 2px @accent_color;
+}
+
+/* The laser dot */
+.laser-dot {
+  min-width: 16px;
+  min-height: 16px;
+  border-radius: 999px;
+  background: #ff291f;
+  box-shadow: 0 0 6px 2px alpha(#ff291f, 0.45);
+}
+
+/* Ink swatches */
+.swatch {
+  min-width: 22px;
+  min-height: 22px;
+  padding: 2px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px alpha(currentColor, 0.18);
+}
+.swatch:checked {
+  box-shadow: 0 0 0 2px @window_bg_color, 0 0 0 4px @accent_color;
+}
+.swatch.match { background: linear-gradient(135deg, #ff291f, #ffcc00, #30c25a, #0a84ff, #8754f2); }
+.swatch.red { background: #ff291f; }
+.swatch.orange { background: #ff8a00; }
+.swatch.yellow { background: #ffcc00; }
+.swatch.green { background: #30c25a; }
+.swatch.blue { background: #0a84ff; }
+.swatch.purple { background: #8754f2; }
+.swatch.white { background: #ffffff; }
+.swatch.black { background: #1d1d21; }
+
+/* Tap sound tiles */
+.sound-tile {
+  padding: 12px 6px;
+  min-width: 84px;
+  border-radius: 12px;
+}
+.sound-tile:checked {
+  background: alpha(@accent_bg_color, 0.15);
+  color: @accent_color;
+  box-shadow: inset 0 0 0 2px alpha(@accent_bg_color, 0.7);
+}
+
+/* Code snippets */
+.code-card .code {
+  padding: 12px 14px;
+  font-size: 0.9em;
+}
+
+/* Make your own hand */
+.step-number {
+  min-width: 22px;
+  min-height: 22px;
+  border-radius: 999px;
+  background: alpha(currentColor, 0.75);
+  color: @window_bg_color;
+  font-weight: bold;
+  font-size: 0.85em;
+}
+.drop-zone {
+  padding: 22px;
+  border-radius: 12px;
+  border: 1.5px dashed alpha(currentColor, 0.25);
+  background: alpha(currentColor, 0.03);
+}
+.drop-zone:drop(active) {
+  border-color: @accent_color;
+  background: alpha(@accent_bg_color, 0.08);
+}
+.drop-zone.problem image {
+  color: @warning_color;
+}
+.hand-preview {
+  border-radius: 12px;
+  background: #e8cfb5;
+  padding: 10px;
+}
+
+/* About */
+.about-icon {
+  -gtk-icon-size: 96px;
+}
