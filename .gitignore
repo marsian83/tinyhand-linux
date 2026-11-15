@@ -1,0 +1,6 @@
+/target/
+/build/
+/dist/
+# makepkg output when building packaging/arch in place
+/packaging/arch/*
+!/packaging/arch/PKGBUILD

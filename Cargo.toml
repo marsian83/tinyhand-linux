@@ -1,0 +1,79 @@
+[package]
+name = "tinyhand"
+version = "0.1.0"
+edition = "2021"
+description = "A tiny hand on a stick that points at things on your Linux screen (port of TinyHand for macOS)"
+license = "MIT"
+repository = "https://github.com/marsian83/tinyhand-linux"
+
+# The settings window (GTK 4 + libadwaita) is a second package. It isn't a default
+# member, so `cargo build` / `cargo test` here build only the pointer and never need GTK.
+# Build it with `cargo build --release -p tinyhand-settings` (or `--workspace`).
+[workspace]
+members = [".", "settings"]
+default-members = ["."]
+
+[dependencies]
+smithay-client-toolkit = { version = "0.21", default-features = false }
+wayland-client = "0.31"
+wayland-protocols = { version = "0.32", features = ["client", "staging"] }
+png = "0.18"
+# Already built for x11rb and wayland; used directly for poll, flock and shared memory.
+rustix = { version = "1", features = ["event", "fs", "mm", "process"] }
+x11rb = { version = "0.14", default-features = false, features = ["shm", "shape", "render", "randr", "xfixes", "xinput", "xtest"] }
+zbus = { version = "5", default-features = false, features = ["blocking-api", "async-io"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+# Packaging. Both take the hands from assets/hands.
+# The packages include the settings window, which `cargo deb` / `cargo build` don't build
+# by default (it isn't a default workspace member), so build everything first:
+#   cargo build --release --workspace && cargo deb --no-build
+
+[package.metadata.deb]
+maintainer = "Spandan Barve <spandan567@gmail.com>"
+copyright = "2026 Kamran Ahmed; 2026 Spandan Barve (Linux port)"
+license-file = ["LICENSE", "0"]
+extended-description = """\
+Unofficial Linux port of TinyHand by Kamran Ahmed (https://tinyhand.app). \
+Bind `tinyhand toggle` to a key: click to tap, drag to draw, hold Alt to click for real. \
+Works on Wayland desktops with wlr-layer-shell (KDE Plasma, Hyprland, Sway, niri, ...)."""
+section = "utils"
+priority = "optional"
+# $auto reads the binaries' libraries; the settings window adds GTK 4 and libadwaita.
+depends = "$auto, libgtk-4-1 (>= 4.12), libadwaita-1-0 (>= 1.4)"
+recommends = "libasound2t64 | libasound2"
+assets = [
+    ["target/release/tinyhand", "usr/bin/", "755"],
+    ["target/release/tinyhand-settings", "usr/bin/", "755"],
+    ["assets/hands/hand_*.png", "usr/share/tinyhand/hands/", "644"],
+    ["packaging/tinyhand.desktop", "usr/share/applications/", "644"],
+    ["packaging/tinyhand-settings.desktop", "usr/share/applications/", "644"],
+    ["packaging/icons/tinyhand.svg", "usr/share/icons/hicolor/scalable/apps/", "644"],
+    ["packaging/icons/tinyhand.png", "usr/share/icons/hicolor/512x512/apps/", "644"],
+    ["README.md", "usr/share/doc/tinyhand/", "644"],
+]
+
+# The settings window's GTK 4 and libadwaita requirements come from rpm's automatic
+# library dependencies (package names differ between Fedora and openSUSE).
+[package.metadata.generate-rpm]
+release = "1"
+assets = [
+    { source = "target/release/tinyhand", dest = "/usr/bin/tinyhand", mode = "755" },
+    { source = "target/release/tinyhand-settings", dest = "/usr/bin/tinyhand-settings", mode = "755" },
+    { source = "assets/hands/hand_*.png", dest = "/usr/share/tinyhand/hands/", mode = "644" },
+    { source = "packaging/tinyhand.desktop", dest = "/usr/share/applications/tinyhand.desktop", mode = "644" },
+    { source = "packaging/tinyhand-settings.desktop", dest = "/usr/share/applications/tinyhand-settings.desktop", mode = "644" },
+    { source = "packaging/icons/tinyhand.svg", dest = "/usr/share/icons/hicolor/scalable/apps/tinyhand.svg", mode = "644" },
+    { source = "packaging/icons/tinyhand.png", dest = "/usr/share/icons/hicolor/512x512/apps/tinyhand.png", mode = "644" },
+    { source = "LICENSE", dest = "/usr/share/licenses/tinyhand/LICENSE", mode = "644", doc = true },
+    { source = "README.md", dest = "/usr/share/doc/tinyhand/README.md", mode = "644", doc = true },
+]
+
+[package.metadata.generate-rpm.recommends]
+alsa-lib = "*"
