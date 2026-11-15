@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=TinyHand Settings
+GenericName=Pointer Settings
+Comment=Pick your hand, its size, ink, tap sound and shortcuts for TinyHand
+Exec=tinyhand-settings
+Icon=tinyhand
+Terminal=false
+StartupNotify=true
+StartupWMClass=app.tinyhand.Settings
+Categories=Settings;GTK;
+Keywords=pointer;presentation;hand;settings;preferences;
