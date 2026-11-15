@@ -24,7 +24,7 @@ use std::{
 use crate::{
     config::{self, Config},
     hand::{self, Image, Meta, Sprite},
-    ink::Stroke,
+    ink::{Stroke, Style},
     ipc::Cmd,
     pose::{Arm, Pose},
     raster::{self, Frame, Laser, Plan},
@@ -45,6 +45,10 @@ const MIN_FADE_DELAY: f32 = 0.5;
 /// Ink line width as a fraction of the output height, and its minimum (logical px).
 const INK_WIDTH: f32 = 0.0055;
 const INK_MIN_WIDTH: f32 = 3.0;
+/// Laser trails: the bright core's width as a fraction of the ink width (the glow adds
+/// the rest), and how long the trail stays after the drag ends, seconds.
+const LASER_CORE: f32 = 0.6;
+const LASER_FADE_DELAY: f32 = 0.7;
 /// Ink tile edge (logical px), before rounding up to whole device pixels.
 const INK_TILE: i32 = 128;
 
@@ -597,14 +601,20 @@ impl<T> Session<T> {
     fn begin_stroke(&mut self, at: (f32, f32)) {
         let Some(out) = self.out else { return };
         let width = (out.h as f32 * INK_WIDTH).max(INK_MIN_WIDTH);
-        let stroke = Stroke::new(self.cfg.ink_colour(), width, out.scale, ink_tile(out.scale));
+        let (style, width) = if self.cfg.is_laser() { (Style::Laser, width * LASER_CORE) } else { (Style::Ink, width) };
+        let stroke = Stroke::styled(style, self.cfg.ink_colour(), width, out.scale, ink_tile(out.scale));
         self.ink.begin(stroke, at);
         self.dirty = true;
     }
 
     fn end_stroke(&mut self) {
-        let fade_at = (self.cfg.fade_seconds > 0.0)
-            .then(|| Instant::now() + Duration::from_secs_f32(self.cfg.fade_seconds.max(MIN_FADE_DELAY)));
+        // A laser trail always fades soon after the drag ends; ink follows the setting.
+        let delay = if self.cfg.is_laser() {
+            Some(LASER_FADE_DELAY)
+        } else {
+            (self.cfg.fade_seconds > 0.0).then(|| self.cfg.fade_seconds.max(MIN_FADE_DELAY))
+        };
+        let fade_at = delay.map(|d| Instant::now() + Duration::from_secs_f32(d));
         if self.ink.end(fade_at) {
             self.dirty = true;
         }

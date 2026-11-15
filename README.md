@@ -301,7 +301,7 @@ shadow = true
 sound = true             # tap sound for hands
 laser_sound = false      # tap sound for the laser dot
 tap_sound = thock        # thock, click, pop, wood, boop, squeak
-fade_seconds = 3         # 0 keeps drawings until you clear them
+fade_seconds = 3         # 0 keeps drawings until you clear them (laser trails always fade)
 ink = match              # match (the hand's colour), red, orange, yellow, green, blue, purple, white, black, or #rrggbb
 scroll_through = true    # let the scroll wheel reach the window underneath
 toolbar = lavender, glove, coral, plush, robot, laser   # or: toolbar = off

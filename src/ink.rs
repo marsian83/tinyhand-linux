@@ -25,6 +25,12 @@ const SHADOW_OPACITY: f32 = 0.18;
 const SHADOW_BLUR: f32 = 1.5;
 /// Shadow offset, logical px (right, down).
 const SHADOW_OFFSET: (f32, f32) = (1.0, 1.5);
+/// Laser strokes: how far the glow reaches past the core, logical px.
+const GLOW_REACH: f32 = 13.0;
+/// Laser strokes: the glow's opacity where it is strongest (on the core).
+const GLOW_OPACITY: f32 = 0.9;
+/// Laser strokes: the core is the colour mixed this far towards white.
+const CORE_WHITE: f32 = 0.6;
 /// Maximum distance between a curve and its flattened polyline, device px.
 const FLATTEN_TOLERANCE: f32 = 0.15;
 
@@ -41,12 +47,24 @@ pub struct Palette {
     ink: [u32; 256],
     ink_a: [u32; 256],
     shade: [u32; 256],
+    /// Laser strokes: the glow, premultiplied ARGB per glow coverage.
+    glow: Option<Box<[u32; 256]>>,
     k: u64,
     visible: bool,
 }
 
+/// How a stroke looks.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Style {
+    /// Solid ink with a soft drop shadow (the second coverage plane).
+    Ink,
+    /// A laser trail: a pale core in a glow of the colour (the second plane, centred).
+    Laser,
+}
+
 /// One ink stroke (one drag), stored as sparse tiles of coverage.
 pub struct Stroke {
+    style: Style,
     rgb: [u8; 3],
     scale: f32,
     tile: i32,
@@ -75,19 +93,28 @@ impl Stroke {
     /// px per logical px (e.g. 1.6); `tile` is the tile side in logical px, chosen by the
     /// caller so that `tile * scale` is a whole number.
     pub fn new(colour: u32, width: f32, scale: f32, tile: i32) -> Stroke {
+        Self::styled(Style::Ink, colour, width, scale, tile)
+    }
+
+    /// A stroke in `style`; `width` is the core's width for `Style::Laser`.
+    pub fn styled(style: Style, colour: u32, width: f32, scale: f32, tile: i32) -> Stroke {
         let scale = if scale > 0.0 { scale } else { 1.0 };
         let tile = tile.max(1);
         let tile_px = ((tile as f32 * scale).round() as usize).max(1);
         let radius = width.max(0.0) * scale / 2.0;
-        let blur = SHADOW_BLUR * scale;
+        let (blur, offset) = match style {
+            Style::Ink => (SHADOW_BLUR * scale, (SHADOW_OFFSET.0 * scale, SHADOW_OFFSET.1 * scale)),
+            Style::Laser => (GLOW_REACH * scale, (0.0, 0.0)),
+        };
         Stroke {
+            style,
             rgb: [(colour >> 16) as u8, (colour >> 8) as u8, colour as u8],
             scale,
             tile,
             tile_px,
             radius,
             blur,
-            offset: (SHADOW_OFFSET.0 * scale, SHADOW_OFFSET.1 * scale),
+            offset,
             max_piece: (2.0 * (radius + blur)).max(8.0),
             tiles: HashMap::new(),
             last: None,
@@ -164,15 +191,25 @@ impl Stroke {
     /// Build it once per frame and reuse it for every tile.
     pub fn palette(&self, alpha: f32) -> Palette {
         let alpha = if alpha.is_nan() { 0.0 } else { alpha.clamp(0.0, 1.0) };
+        let core = match self.style {
+            Style::Ink => self.rgb,
+            Style::Laser => self.rgb.map(|c| (f32::from(c) + (255.0 - f32::from(c)) * CORE_WHITE).round() as u8),
+        };
         // Ink at coverage i (no shadow): premultiplied colour and alpha.
         let mut ink = [0u32; 256];
         let mut ink_a = [0u32; 256];
         for (i, (px, pa)) in ink.iter_mut().zip(ink_a.iter_mut()).enumerate() {
             let k = i as f32 / 255.0 * alpha;
-            let ch = |c: u8| (c as f32 * k).round() as u32;
             *pa = (255.0 * k).round() as u32;
-            *px = (*pa << 24) | (ch(self.rgb[0]) << 16) | (ch(self.rgb[1]) << 8) | ch(self.rgb[2]);
+            *px = premul(core, k);
         }
+        let glow = (self.style == Style::Laser).then(|| {
+            let mut g = Box::new([0u32; 256]);
+            for (i, px) in g.iter_mut().enumerate() {
+                *px = premul(self.rgb, i as f32 / 255.0 * GLOW_OPACITY * alpha);
+            }
+            g
+        });
         // Shadow alpha in 0..=46 (0.18 × 255) per shadow coverage.
         let mut shade = [0u32; 256];
         for (s, v) in shade.iter_mut().enumerate() {
@@ -180,7 +217,7 @@ impl Stroke {
         }
         // Final alpha = alpha · (ink·255 + shadow·(255 − ink)) / 255; k = alpha · 2^24 / 255.
         let k = (alpha as f64 * (1u64 << 24) as f64 / 255.0).round() as u64;
-        Palette { ink, ink_a, shade, k, visible: alpha > 0.0 }
+        Palette { ink, ink_a, shade, glow, k, visible: alpha > 0.0 }
     }
 
     /// Render a tile as premultiplied ARGB (`0xAARRGGBB`), row-major `tile_px × tile_px`,
@@ -202,6 +239,16 @@ impl Stroke {
             out.fill(0);
             return;
         };
+        if let Some(glow) = &pal.glow {
+            // The core over the glow: out = core + glow · (1 − core alpha), per channel.
+            for (o, &[ci, cs]) in out.iter_mut().zip(tile.cov.iter()) {
+                let (c, g) = (pal.ink[ci as usize], glow[cs as usize]);
+                let keep = 255 - (c >> 24);
+                let ch = |sh: u32| ((c >> sh) & 0xff) + (((g >> sh) & 0xff) * keep + 127) / 255;
+                *o = ch(24) << 24 | ch(16) << 16 | ch(8) << 8 | ch(0);
+            }
+            return;
+        }
         for (o, &[ci, cs]) in out.iter_mut().zip(tile.cov.iter()) {
             *o = if cs == 0 || ci == 255 {
                 pal.ink[ci as usize]
@@ -281,6 +328,8 @@ impl Stroke {
         let ink_reach2 = ink_reach * ink_reach;
         let shadow_reach2 = shadow_reach * shadow_reach;
         let inv_soft = 1.0 / (2.0 * self.blur);
+        let laser = self.style == Style::Laser;
+        let inv_reach = 1.0 / shadow_reach;
 
         let tp = self.tile_px as i32;
         let n = self.tile_px * self.tile_px;
@@ -310,11 +359,15 @@ impl Stroke {
                         let ts = (t - dt_shadow).clamp(0.0, 1.0);
                         let (sx, sy) = (qx - ox - ts * abx, qy - oy - ts * aby);
                         let s2 = sx * sx + sy * sy;
-                        let cs = if s2 < shadow_reach2 {
+                        let cs = if s2 >= shadow_reach2 {
+                            0
+                        } else if laser {
+                            // Glow: saturated right around the core, then a long soft tail.
+                            let x = 1.0 - s2.sqrt() * inv_reach;
+                            ((1.6 * x * x * x.sqrt()).min(1.0) * 255.0 + 0.5) as u8
+                        } else {
                             let x = ((shadow_reach - s2.sqrt()) * inv_soft).min(1.0);
                             (x * x * (3.0 - 2.0 * x) * 255.0 + 0.5) as u8
-                        } else {
-                            0
                         };
 
                         if ci == 0 && cs == 0 {
@@ -345,6 +398,12 @@ impl Stroke {
             }
         }
     }
+}
+
+/// `rgb` at opacity `k`, premultiplied ARGB.
+fn premul(rgb: [u8; 3], k: f32) -> u32 {
+    let ch = |c: u8| (f32::from(c) * k).round() as u32;
+    ((255.0 * k).round() as u32) << 24 | ch(rgb[0]) << 16 | ch(rgb[1]) << 8 | ch(rgb[2])
 }
 
 #[cfg(test)]
@@ -398,6 +457,24 @@ mod tests {
         assert_eq!(ink_at(&s, (51.0, 61.5)).1, 255);
         assert_eq!(ink_at(&s, (51.0, 56.0)).1, 0);
         assert!(ink_at(&s, (51.0, 64.0)).1 > 150);
+    }
+
+    #[test]
+    fn laser_glow_is_centred_and_core_is_pale() {
+        let mut s = Stroke::styled(Style::Laser, 0xFF291F, 4.0, SCALE, TILE);
+        s.begin((60.0, 60.0));
+        // The glow surrounds the core evenly (no shadow offset) and reaches past it.
+        assert_eq!(ink_at(&s, (60.0, 52.0)).1, ink_at(&s, (60.0, 68.0)).1);
+        assert!(ink_at(&s, (60.0, 52.0)).1 > 0 && ink_at(&s, (60.0, 52.0)).0 == 0);
+        // The core renders paler than the glow's colour.
+        let pal = s.palette(1.0);
+        let mut out = vec![0u32; s.tile_px() * s.tile_px()];
+        s.render_tile_with((0, 0), &pal, &mut out);
+        let at = |x: f32, y: f32| out[(y * SCALE) as usize * s.tile_px() + (x * SCALE) as usize];
+        let (core, glow) = (at(60.0, 60.0), at(60.0, 55.0));
+        assert_eq!(core >> 24, 255);
+        assert!((core >> 8 & 0xff) > 150, "core is pale: {core:08x}");
+        assert!((glow >> 16 & 0xff) > (glow >> 8 & 0xff) * 2, "glow is red: {glow:08x}");
     }
 
     #[test]

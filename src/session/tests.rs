@@ -117,7 +117,7 @@ fn a_scroll_lets_input_through_for_a_moment() {
 
 #[test]
 fn drawings_fade_out_on_schedule() {
-    let mut s = session("laser");
+    let mut s = session("coral");
     s.cfg.fade_seconds = 1.0;
     s.press(Button::Left, (100.0, 100.0));
     s.motion((300.0, 200.0));
@@ -170,12 +170,27 @@ fn compositor_fades_change_alpha_without_redrawing() {
 
 #[test]
 fn fade_zero_keeps_drawings() {
-    let mut s = session("laser");
+    let mut s = session("coral");
     s.cfg.fade_seconds = 0.0;
     s.press(Button::Left, (100.0, 100.0));
     s.motion((300.0, 200.0));
     s.release(Button::Left);
-    assert_eq!(s.next_deadline(Instant::now()), None);
+    let now = settle(&mut s, Instant::now());
+    assert!(!s.ink.is_empty());
+    assert_eq!(s.next_deadline(now), None);
+}
+
+#[test]
+fn laser_trails_always_fade_soon() {
+    let mut s = session("laser");
+    s.cfg.fade_seconds = 0.0; // "keep drawings" is for ink, not the laser
+    s.press(Button::Left, (100.0, 100.0));
+    s.motion((300.0, 200.0));
+    let before = Instant::now();
+    s.release(Button::Left);
+    let at = s.next_deadline(before).expect("the trail fades");
+    assert!(at <= Instant::now() + Duration::from_secs_f32(LASER_FADE_DELAY));
+    assert!(at >= before + Duration::from_secs_f32(LASER_FADE_DELAY));
 }
 
 #[test]
