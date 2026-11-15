@@ -1,0 +1,61 @@
+# Maintainer: Spandan Barve <spandan567 at gmail dot com>
+# TinyHand for macOS by Kamran Ahmed (https://tinyhand.app). This is an unofficial Linux port.
+
+pkgname=tinyhand-linux-git
+_pkgname=tinyhand-linux
+pkgver=r1.0000000
+pkgrel=1
+pkgdesc='A tiny hand on a stick that points at things on your screen (unofficial Linux port of TinyHand)'
+arch=('x86_64' 'aarch64')
+url='https://github.com/marsian83/tinyhand-linux'
+license=('MIT')
+# The pointer links only glibc and libgcc_s (Wayland and X11 are spoken in pure Rust);
+# ALSA is loaded at run time for the tap sound. The settings window (tinyhand-settings) needs
+# GTK 4 and libadwaita.
+depends=('gcc-libs' 'glibc' 'gtk4' 'libadwaita' 'hicolor-icon-theme')
+optdepends=('alsa-lib: tap sound')
+makedepends=('cargo' 'git')
+provides=('tinyhand')
+conflicts=('tinyhand')
+options=('!lto' '!debug')
+source=("$_pkgname::git+$url.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$_pkgname"
+  printf 'r%s.%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+}
+
+prepare() {
+  cd "$_pkgname"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "$_pkgname"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo build --frozen --release --workspace
+}
+
+check() {
+  cd "$_pkgname"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  # Release builds don't look in the checkout for hands by themselves.
+  TINYHAND_ASSETS="$PWD/assets/hands" cargo test --frozen --release --workspace
+}
+
+package() {
+  cd "$_pkgname"
+  install -Dm755 target/release/tinyhand "$pkgdir/usr/bin/tinyhand"
+  install -Dm755 target/release/tinyhand-settings "$pkgdir/usr/bin/tinyhand-settings"
+  install -Dm644 -t "$pkgdir/usr/share/tinyhand/hands" assets/hands/hand_*.png
+  install -Dm644 packaging/tinyhand.desktop "$pkgdir/usr/share/applications/tinyhand.desktop"
+  install -Dm644 packaging/tinyhand-settings.desktop "$pkgdir/usr/share/applications/tinyhand-settings.desktop"
+  install -Dm644 packaging/icons/tinyhand.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/tinyhand.svg"
+  install -Dm644 packaging/icons/tinyhand.png "$pkgdir/usr/share/icons/hicolor/512x512/apps/tinyhand.png"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
