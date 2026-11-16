@@ -200,7 +200,7 @@ fn read(path: &Path) -> Result<Pixels, String> {
             buf
         }
         png::ColorType::GrayscaleAlpha => {
-            buf[..w * h * 2].chunks_exact(2).flat_map(|p| [p[0], p[0], p[0], p[1]]).collect()
+            buf[..w * h * 2].as_chunks::<2>().0.iter().flat_map(|p| [p[0], p[0], p[0], p[1]]).collect()
         }
         _ => return Err(NOT_TRANSPARENT.into()),
     };
@@ -328,8 +328,8 @@ fn bounds(p: &Pixels) -> Option<Bounds> {
     let mut any = false;
     for y in 0..p.h {
         let row = &p.rgba[y * p.w * 4..(y + 1) * p.w * 4];
-        let Some(lo) = row.chunks_exact(4).position(|px| px[3] > 128) else { continue };
-        let hi = row.chunks_exact(4).rposition(|px| px[3] > 128).unwrap_or(lo);
+        let Some(lo) = row.as_chunks::<4>().0.iter().position(|px| px[3] > 128) else { continue };
+        let hi = row.as_chunks::<4>().0.iter().rposition(|px| px[3] > 128).unwrap_or(lo);
         any = true;
         b.min_x = b.min_x.min(lo);
         b.max_x = b.max_x.max(hi);
@@ -426,7 +426,7 @@ fn compose(p: &Pixels) -> Option<Vec<u8>> {
     let mut horiz = vec![[0f32; 4]; ow * src_rows.len()];
     for (ry, y) in src_rows.clone().enumerate() {
         let row = &p.rgba[y * p.w * 4..(y + 1) * p.w * 4];
-        if row.chunks_exact(4).all(|px| px[3] == 0) {
+        if row.as_chunks::<4>().0.iter().all(|px| px[3] == 0) {
             continue;
         }
         let out = &mut horiz[ry * ow..(ry + 1) * ow];
@@ -470,7 +470,7 @@ fn compose(p: &Pixels) -> Option<Vec<u8>> {
 
     // Back to straight RGBA8; fully transparent pixels stay all zero.
     let mut out = vec![0u8; CANVAS_W * CANVAS_H * 4];
-    for (o, c) in out.chunks_exact_mut(4).zip(&canvas) {
+    for (o, c) in out.as_chunks_mut::<4>().0.iter_mut().zip(&canvas) {
         let a = c[3].round().clamp(0.0, 255.0);
         if a <= 0.0 {
             continue;
@@ -850,7 +850,7 @@ pub(crate) mod tests {
         assert!(sprite.w > 0 && sprite.h > 140);
 
         // Gray-alpha input works too.
-        let ga: Vec<u8> = rgba.chunks_exact(4).flat_map(|p| [p[0], p[3]]).collect();
+        let ga: Vec<u8> = rgba.as_chunks::<4>().0.iter().flat_map(|p| [p[0], p[3]]).collect();
         write_png(&d.join("ga.png"), w, h, png::ColorType::GrayscaleAlpha, &ga);
         let gray = make(&d.join("ga.png")).unwrap();
         assert_eq!(gray.ink, 0x6b727f, "a colourless hand gets slate ink");
