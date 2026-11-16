@@ -6,10 +6,10 @@
 
 <p align="center">
   <a href="https://github.com/marsian83/tinyhand-linux/actions/workflows/ci.yml"><img src="https://github.com/marsian83/tinyhand-linux/actions/workflows/ci.yml/badge.svg" alt="CI status" /></a>
-  <a href="https://aur.archlinux.org/packages/tinyhand-linux-git"><img src="https://img.shields.io/aur/version/tinyhand-linux-git?color=E8735A&label=AUR" alt="AUR package" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/marsian83/tinyhand-linux?color=E8735A" alt="MIT license" /></a>
   <img src="https://img.shields.io/badge/Wayland_%2B_X11-555" alt="Runs on Wayland and X11" />
   <img src="https://img.shields.io/badge/Rust-000?logo=rust&logoColor=white" alt="Written in Rust" />
+  <a href="https://tinyhand.app"><img src="https://img.shields.io/badge/port_of-TinyHand-8754F2" alt="A port of TinyHand for macOS" /></a>
 </p>
 
 <p align="center">
@@ -19,9 +19,11 @@
   &nbsp;·&nbsp;
   <a href="#use">How to use it</a>
   &nbsp;·&nbsp;
-  <a href="#differences-from-the-macos-app">Differences from macOS</a>
+  <a href="#make-your-own-hand">Make your own hand</a>
   &nbsp;·&nbsp;
-  <a href="#resource-use">Resource use</a>
+  <a href="docs/reference.md">Reference</a>
+  &nbsp;·&nbsp;
+  <a href="#differences-from-the-macos-app">Differences from macOS</a>
 </p>
 
 When you share your screen, a mouse cursor is a tiny arrow nobody follows. TinyHand turns
@@ -29,7 +31,7 @@ it into a hand on a stick: click to tap (with a little sound), drag to draw on t
 screen, and hold <kbd>Alt</kbd> when you need to click something for real.
 
 <p align="center">
-  <img src="docs/images/demo.gif" width="100%" alt="The TinyHand pointer tapping and drawing over a code editor, then switching hands from the toolbar" />
+  <img src="docs/images/demo.gif" width="100%" alt="The TinyHand pointer walking through a slide and a spreadsheet: it underlines a headline, taps a figure, circles a number, then switches to a robot hand, a coral hand and a laser dot from the toolbar" />
 </p>
 
 This is a Linux port of [TinyHand](https://tinyhand.app) by
@@ -43,45 +45,65 @@ follows your desktop's light or dark style and accent colour.
 > Please report Linux problems [here](https://github.com/marsian83/tinyhand-linux/issues),
 > not on the original project.
 
-## Supported desktops
+<p align="center">
+  <img src="docs/images/hands.webp" width="100%" alt="Twelve of the hands in a row: lavender, white glove, coral, blue plush, robot, skeleton, astronaut, cactus, lava, gingerbread, neon and knitted" />
+</p>
 
-| Desktop | Session | How it draws | Status |
-|---|---|---|---|
-| Hyprland | Wayland | wlr-layer-shell | Tested |
-| KDE Plasma, Sway, niri, river, COSMIC, Wayfire, labwc | Wayland | wlr-layer-shell | Should work (same protocols; not yet tested) |
-| Xfce, Cinnamon, MATE, i3, KDE on X11, … | X11 | override-redirect windows | Tested on a headless Xorg; not yet on real desktops |
-| GNOME | Wayland | X11 backend through XWayland (GNOME has no layer-shell) | Untested; "hold Alt" only works over X11 apps, use `tinyhand real` |
-
-TinyHand picks Wayland when the compositor offers wlr-layer-shell and falls back to X11
-otherwise. `TINYHAND_BACKEND=x11` or `=wayland` forces one.
+<p align="center">36 hands and a laser dot. Pick one from the toolbar, or <a href="#make-your-own-hand">make your own</a>.</p>
 
 ## Install
 
-### Arch Linux (AUR)
+You build it from source, which takes a few minutes. You need `git` and a stable
+Rust toolchain (`cargo`).
 
 ```sh
-yay -S tinyhand-linux-git      # or: paru -S tinyhand-linux-git
+git clone --depth 1 https://github.com/marsian83/tinyhand-linux.git
+cd tinyhand-linux
+cargo build --release
+packaging/install.sh        # into ~/.local, no root needed
 ```
 
-Or build the package from a checkout: `cd packaging/arch && makepkg -si`.
+`~/.local/bin` has to be on your `PATH`. Then [bind `tinyhand toggle` to a key](#set-up-the-shortcut).
 
-### Prebuilt tarball (any distro)
+<details>
+<summary><strong>Also build the settings window</strong></summary>
 
-Download `tinyhand-linux-<arch>.tar.gz` from the [latest release](https://github.com/marsian83/tinyhand-linux/releases/latest), then:
+The settings window is a second program in the same workspace. It needs the GTK 4 and
+libadwaita development packages (`gtk4` and `libadwaita` on Arch, `libgtk-4-dev` and
+`libadwaita-1-dev` on Debian and Ubuntu, `gtk4-devel` and `libadwaita-devel` on Fedora).
+Build everything before you run `install.sh` and it gets installed too:
 
 ```sh
-tar xf tinyhand-linux-x86_64.tar.gz
-cd tinyhand-linux-x86_64
-./install.sh                # into ~/.local (no root needed)
-sudo ./install.sh --system  # or into /usr/local
-./install.sh --uninstall    # remove it again (add --system if you installed it there)
+cargo build --release --workspace
+packaging/install.sh
 ```
 
-`~/.local/bin` has to be on your `PATH`. The binary needs glibc 2.28 or later. The CI
-tarball has the pointer only; `install.sh` also installs `tinyhand-settings` when it sits
-next to it (or in `target/release` of a checkout).
+</details>
 
-### Debian / Ubuntu (.deb)
+<details>
+<summary><strong>Install system-wide, or remove it again</strong></summary>
+
+```sh
+sudo packaging/install.sh --system   # into /usr/local
+packaging/install.sh --uninstall     # remove it (add --system if you installed it there)
+```
+
+</details>
+
+<details>
+<summary><strong>Arch Linux package</strong></summary>
+
+It isn't on the AUR yet. Build the package from the checkout:
+
+```sh
+cd packaging/arch
+makepkg -si
+```
+
+</details>
+
+<details>
+<summary><strong>Debian / Ubuntu (.deb)</strong></summary>
 
 ```sh
 cargo install cargo-deb
@@ -90,7 +112,10 @@ cargo deb --no-build
 sudo apt install ./target/debian/tinyhand_*.deb
 ```
 
-### Fedora / openSUSE (.rpm)
+</details>
+
+<details>
+<summary><strong>Fedora / openSUSE (.rpm)</strong></summary>
 
 ```sh
 cargo install cargo-generate-rpm
@@ -99,40 +124,12 @@ cargo generate-rpm
 sudo dnf install ./target/generate-rpm/tinyhand-*.rpm
 ```
 
-### From source
-
-You need a stable Rust toolchain:
-
-```sh
-cargo build --release
-./target/release/tinyhand toggle
-```
-
-That builds only the pointer, which needs no GTK. The settings window is a second program
-in the same workspace; it needs the GTK 4 and libadwaita development packages:
-
-```sh
-cargo build --release -p tinyhand-settings
-./target/release/tinyhand settings
-```
-
-A debug build (`cargo run`) finds the hands in `assets/hands` by itself; for a release
-build from the checkout, set `TINYHAND_ASSETS=$PWD/assets/hands`. To install by hand,
-copy `target/release/tinyhand` onto your `PATH` and `assets/hands` to
-`/usr/share/tinyhand/hands/`, or run `packaging/install.sh`.
-
-The hands in `assets/hands` are the original app's, made smaller by
-`scripts/prepare-hands.py` (about 65 MB down to about 12 MB). It clears hidden pixel
-data and trims empty columns; it doesn't scale or recolour anything.
-
-Tap sounds are built into the binary. They play through ALSA (`libasound.so.2`), which
-also reaches PipeWire and PulseAudio. Without it TinyHand stays silent.
+</details>
 
 ## Set up the shortcut
 
 There is no menu bar icon and nothing runs in the background. `tinyhand toggle` starts
-the pointer, and running it again ends the process. **`tinyhand setup` prints the exact
-lines for the desktop you're on.** Wayland doesn't let apps grab global
+the pointer, and running it again ends the process. Wayland doesn't let apps grab global
 keys, so bind the commands in your desktop's settings. The suggested keys match the
 macOS app:
 
@@ -141,7 +138,12 @@ macOS app:
 | **Ctrl+Alt+H** | `tinyhand toggle` |
 | **Ctrl+Alt+X** | `tinyhand clear` |
 
-**Hyprland** (`~/.config/hypr/hyprland.conf`)
+**`tinyhand setup` prints the exact lines for the desktop you're on.** They are also here:
+
+<details>
+<summary><strong>Hyprland</strong></summary>
+
+`~/.config/hypr/hyprland.conf`:
 
 ```ini
 bind = CTRL ALT, H, exec, tinyhand toggle
@@ -157,14 +159,24 @@ hl.bind("CTRL + ALT + X", hl.dsp.exec_cmd("tinyhand clear"), { description = "Ti
 hl.layer_rule({ match = { namespace = "tinyhand" }, no_anim = true })
 ```
 
-**Sway** (`~/.config/sway/config`)
+</details>
+
+<details>
+<summary><strong>Sway</strong></summary>
+
+`~/.config/sway/config`:
 
 ```
 bindsym Ctrl+Alt+h exec tinyhand toggle
 bindsym Ctrl+Alt+x exec tinyhand clear
 ```
 
-**niri** (`~/.config/niri/config.kdl`)
+</details>
+
+<details>
+<summary><strong>niri</strong></summary>
+
+`~/.config/niri/config.kdl`:
 
 ```kdl
 binds {
@@ -173,14 +185,22 @@ binds {
 }
 ```
 
-**river** (`~/.config/river/init`)
+</details>
+
+<details>
+<summary><strong>river</strong></summary>
+
+`~/.config/river/init`:
 
 ```sh
 riverctl map normal Control+Alt H spawn 'tinyhand toggle'
 riverctl map normal Control+Alt X spawn 'tinyhand clear'
 ```
 
-**KDE Plasma**
+</details>
+
+<details>
+<summary><strong>KDE Plasma</strong></summary>
 
 1. Open **System Settings > Keyboard > Shortcuts**.
 2. Click **Add New > Command or Script...**, enter `tinyhand toggle` and press **Add**.
@@ -190,7 +210,10 @@ riverctl map normal Control+Alt X spawn 'tinyhand clear'
 If you installed a package, you can also use **Add New > Application...** and pick
 TinyHand, which runs `tinyhand toggle`.
 
-**GNOME**
+</details>
+
+<details>
+<summary><strong>GNOME</strong></summary>
 
 GNOME has no layer-shell, so TinyHand uses its X11 backend through XWayland there.
 Add the shortcuts in **Settings > Keyboard > Keyboard Shortcuts > Custom Shortcuts**,
@@ -214,6 +237,8 @@ gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings \
   "['$KEY/tinyhand-toggle/', '$KEY/tinyhand-clear/']"
 ```
 
+</details>
+
 ## Use
 
 | | |
@@ -221,126 +246,34 @@ gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings \
 | **Ctrl+Alt+H** (`tinyhand toggle`) | Turn the pointer on or off |
 | Click | Tap (nothing underneath gets clicked) |
 | Hold and drag | Draw on the screen (fades after 3 s by default) |
-| Hold **Alt** and click | Click the thing underneath for real (needs the binding below) |
+| Hold **Alt** and click | Click the thing underneath for real (needs [one more binding](docs/reference.md#click-for-real-hold-a-key)) |
 | Scroll | Scrolls the window underneath |
 | **Ctrl+Alt+X** (`tinyhand clear`) | Clear the drawing |
 | Toolbar at the bottom | Pick a pinned hand or the laser dot, mute the tap, or exit |
 
-`tinyhand setup` prints the right key bindings for the desktop you're on.
+`tinyhand settings` opens a window for the hand, its size, the ink colour, the tap sound
+and the toolbar. The [reference](docs/reference.md) covers every command, the settings
+window and the config file.
 
-### Commands
+## Make your own hand
 
-```
-tinyhand [on|off|toggle]       turn the pointer on / off
-tinyhand clear                 clear the drawing
-tinyhand real [on|off]         let clicks through to apps (no argument toggles)
-tinyhand hand NAME|PATH        switch hand while it's on (e.g. coral, robot, laser)
-tinyhand sound [on|off|NAME]   tap sound on/off, or pick thock, click, pop, wood, boop, squeak
-tinyhand hands                 list the 36 built-in hands and your own
-tinyhand prompt [IDEA]         print a prompt for ChatGPT or another image tool to draw a hand
-tinyhand make-hand IMAGE [NAME]  check that image, put it on a stick and add it as a hand
-tinyhand remove-hand ID        delete one of your own hands
-tinyhand setup                 print key bindings for your desktop
-tinyhand settings              open the settings window
-```
+Run `tinyhand prompt knitted wool in mustard yellow` (any style you like), paste the
+prompt into ChatGPT or another image tool, save the PNG it draws and run
+`tinyhand make-hand that.png "Wool"`. TinyHand checks the image, puts it on a stick,
+picks an ink colour and adds it to your hands. The settings window does the same with
+drag and drop.
 
-Commands reach the running pointer through a socket in `$XDG_RUNTIME_DIR`. When the
-pointer is off they do nothing (except `on`/`toggle`, which start it).
+## Supported desktops
 
-### Click for real (hold a key)
+| Desktop | Session | How it draws | Status |
+|---|---|---|---|
+| Hyprland | Wayland | wlr-layer-shell | Tested |
+| KDE Plasma, Sway, niri, river, COSMIC, Wayfire, labwc | Wayland | wlr-layer-shell | Should work (same protocols; not yet tested) |
+| Xfce, Cinnamon, MATE, i3, KDE on X11, … | X11 | override-redirect windows | Tested on a headless Xorg; not yet on real desktops |
+| GNOME | Wayland | X11 backend through XWayland (GNOME has no layer-shell) | Untested; "hold Alt" only works over X11 apps, use `tinyhand real` |
 
-Wayland doesn't let an app watch the keyboard while another app has focus, so "hold Alt
-to click for real" is a pair of bindings: one on press, one on release. Hyprland can bind a
-key without taking it away from apps:
-
-```lua
--- ~/.config/hypr/hyprland.lua (Lua config)
-hl.bind("Alt_L", hl.dsp.exec_cmd("tinyhand real on"), { non_consuming = true })
-hl.bind("ALT + Alt_L", hl.dsp.exec_cmd("tinyhand real off"), { non_consuming = true, release = true })
-```
-
-```ini
-# ~/.config/hypr/hyprland.conf (classic config)
-bindn = , Alt_L, exec, tinyhand real on
-bindrn = ALT, Alt_L, exec, tinyhand real off
-```
-
-On other compositors bind `tinyhand real` (a toggle) to a key such as **Ctrl+Alt+R**.
-
-### Settings window
-
-`tinyhand settings` (or **TinyHand Settings** in your app menu) opens a GTK 4 /
-libadwaita window with the same sections as the macOS app:
-
-- **Pointers**: click a hand (or the laser dot) to use it, pin up to 8 to the toolbar and
-  drag them into order, and **make your own hand**: describe it, open the prompt in
-  ChatGPT (or copy it for another image tool), then drop the PNG in to see it on its
-  stick, name it and add it. Your own hands can be renamed and deleted here too.
-- **Look**: size and shadow, and whether scrolling reaches the window underneath.
-- **Drawing**: ink colour, how long lines last, and the toolbar.
-- **Sound**: the tap sound (click one to hear it) and the laser dot's tap.
-- **Shortcuts**: the key-binding lines for your desktop (what `tinyhand setup` prints),
-  ready to copy, and a button to try the pointer.
-- **About**.
-
-Changes are written to the config file right away, and a running pointer picks them up
-at once. The window is a separate program (`tinyhand-settings`) that runs only while it's
-open, so the pointer itself stays as small as before. It needs GTK 4.12 and libadwaita
-1.4 or later (Ubuntu 24.04, Debian 13, Fedora 40 and newer).
-
-### Config file
-
-`~/.config/tinyhand/config`, one `key = value` per line. Command-line options
-(`--hand`, `--size`, `--no-shadow`, `--no-sound`, `--tap-sound`, `--fade`, `--ink`)
-override it.
-
-```ini
-hand = lavender          # one of `tinyhand hands`, "laser", or a path to a PNG
-size = 0.13              # hand height as a fraction of the screen height (0.08–0.20)
-shadow = true
-sound = true             # tap sound for hands
-laser_sound = false      # tap sound for the laser dot
-tap_sound = thock        # thock, click, pop, wood, boop, squeak
-fade_seconds = 3         # 0 keeps drawings until you clear them (laser trails always fade)
-ink = match              # match (the hand's colour), red, orange, yellow, green, blue, purple, white, black, or #rrggbb
-scroll_through = true    # let the scroll wheel reach the window underneath
-toolbar = lavender, glove, coral, plush, robot, laser   # or: toolbar = off
-```
-
-Make your own hand: run `tinyhand prompt knitted wool in mustard yellow` (any style you
-like), paste the prompt into ChatGPT or another image tool, save the PNG it draws and run
-`tinyhand make-hand that.png "Wool"`. TinyHand checks the image (transparent background,
-one upright hand with the finger at the top), puts it on a stick, picks an ink colour and
-prints the new hand's id (`custom-…`), which works anywhere a hand name does. Your hands
-are kept in `~/.local/share/tinyhand/custom/`.
-
-You can also pass the path of any PNG laid out like the built-in hands (a right hand
-pointing up, on a transparent background, ending in a stick at the bottom) as the hand.
-
-TinyHand looks for hands in `$TINYHAND_ASSETS`, `assets/` next to the binary,
-`<prefix>/share/tinyhand/hands` next to the installed binary,
-`$XDG_DATA_HOME/tinyhand/hands`, and `$XDG_DATA_DIRS/tinyhand/hands`.
-
-The toolbar takes its light or dark look and its accent colour from your desktop, through
-the desktop portal (`org.freedesktop.appearance`, which GNOME, KDE Plasma, COSMIC and the
-GTK portal answer). Without an answer it stays dark. `TINYHAND_THEME=light` or
-`TINYHAND_THEME=dark,#3584e4` sets it by hand.
-
-## Differences from the macOS app
-
-- No menu bar icon or self-update: bind the commands to keys, change settings in
-  `tinyhand settings` (or the config file), and update through your package manager.
-  The settings window can't record shortcuts; it shows the lines to add to your desktop's
-  key bindings instead. The toolbar has the pinned hands,
-  the laser, sound and exit, but not the ink-colour tray or hint text (set `ink =` instead).
-- **Esc doesn't turn the pointer off.** The overlay never takes the keyboard (so typing
-  still reaches your app); use the toggle key.
-- **Scrolling** reaches the window underneath, but the first notch of each scroll is
-  used to let the rest through, and the hand hides for a moment while you scroll.
-- **Hover effects** under the pointer (tooltips, highlighted links) don't show while the
-  pointer is on, because the overlay receives the mouse.
-- **Menus:** macOS lets clicks through to open menus automatically. On Linux, hold the
-  click-for-real key to use menus.
+TinyHand picks Wayland when the compositor offers wlr-layer-shell and falls back to X11
+otherwise. `TINYHAND_BACKEND=x11` or `=wayland` forces one.
 
 ## Resource use
 
@@ -360,6 +293,24 @@ How it stays this small: the full-screen overlay is a single transparent pixel s
 by the compositor; the hand, stick and ink are drawn on the CPU into small tiles that
 only cover what's drawn; the shadow is drawn at quarter resolution and scaled up by the
 compositor; and nothing runs between mouse events.
+
+## Differences from the macOS app
+
+- The port follows TinyHand 1.0.2. What 1.1.0 added isn't here yet: drawing arrows,
+  double-tap Shift to click through, and the nine extra tap sounds.
+- No menu bar icon or self-update: bind the commands to keys, change settings in
+  `tinyhand settings` (or the config file), and update by pulling and building again.
+  The settings window can't record shortcuts; it shows the lines to add to your desktop's
+  key bindings instead. The toolbar has the pinned hands,
+  the laser, sound and exit, but not the ink-colour tray or hint text (set `ink =` instead).
+- **Esc doesn't turn the pointer off.** The overlay never takes the keyboard (so typing
+  still reaches your app); use the toggle key.
+- **Scrolling** reaches the window underneath, but the first notch of each scroll is
+  used to let the rest through, and the hand hides for a moment while you scroll.
+- **Hover effects** under the pointer (tooltips, highlighted links) don't show while the
+  pointer is on, because the overlay receives the mouse.
+- **Menus:** macOS lets clicks through to open menus automatically. On Linux, hold the
+  click-for-real key to use menus.
 
 ## License
 
